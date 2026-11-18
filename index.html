@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#10142a">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Sabaha Kadar</title>
+<link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#d9dde3;--panel:#f2f4f7;--ink:#1d2330;--muted:#5a6272;--line:#2b3140;
+  --grass:#4f8a2e;--grass-ink:#fff;--dirt:#6b4a2b;--warn:#b3321f;--chip:#e3e6ec;
+  box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){--bg:#10142a;--panel:#1b2140;--ink:#eef0f7;--muted:#9aa3bf;--line:#05070f;--grass:#6fb544;--grass-ink:#0b1305;--dirt:#8a6238;--warn:#ff7a66;--chip:#262d54}
+}
+:root[data-theme="dark"]{--bg:#10142a;--panel:#1b2140;--ink:#eef0f7;--muted:#9aa3bf;--line:#05070f;--grass:#6fb544;--grass-ink:#0b1305;--dirt:#8a6238;--warn:#ff7a66;--chip:#262d54}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"VT323","Courier New",monospace;font-size:21px;line-height:1.25}
+main{max-width:560px;margin:0 auto;padding:14px}
+h1{font-size:34px;margin:4px 0 12px;font-weight:400;letter-spacing:.5px}
+.box{background:var(--panel);border:4px solid var(--line);box-shadow:4px 4px 0 var(--line);padding:10px 12px;margin-bottom:14px}
+.stats{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.time{display:grid;grid-template-columns:repeat(16,1fr);gap:2px;margin-top:8px}
+.time i{height:10px;background:#f2c14e;border:1px solid var(--line)}
+.time i.n{background:#2a3470}
+.time i.p{opacity:.3}
+.time i.now{outline:2px solid var(--ink);outline-offset:1px}
+.scene{height:130px;border:4px solid var(--line);box-shadow:4px 4px 0 var(--line);margin-bottom:14px;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:54px;letter-spacing:6px}
+.scene.day{background:linear-gradient(#8fd0ff 0 62%,var(--grass) 62% 80%,var(--dirt) 80%)}
+.scene.night{background:linear-gradient(#0e1430 0 62%,#2f5a1c 62% 80%,#4a3320 80%)}
+.scene.cave{background:linear-gradient(#2a2d33 0 80%,#18191d 80%)}
+.scene .moon{position:absolute;top:8px;right:12px;font-size:28px}
+.scene .mob{position:absolute;bottom:14px;left:12px;font-size:34px}
+.text{min-height:3.8em}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{background:var(--chip);border:2px solid var(--line);padding:0 8px}
+.chip.empty{color:var(--muted)}
+.actions{display:grid;grid-template-columns:1fr;gap:8px}
+@media(min-width:520px){.actions{grid-template-columns:1fr 1fr}}
+button{font:inherit;color:var(--grass-ink);background:var(--grass);border:4px solid var(--line);box-shadow:3px 3px 0 var(--line);padding:8px 10px;text-align:left;cursor:pointer;min-height:48px}
+button:active{transform:translate(3px,3px);box-shadow:none}
+button:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+button:disabled{background:var(--chip);color:var(--muted);cursor:not-allowed;box-shadow:none}
+button small{display:block;font-size:17px;opacity:.85}
+.log p{margin:2px 0;color:var(--muted)}
+.log p:first-child{color:var(--ink)}
+.end{text-align:center}
+.end h2{font-size:34px;margin:4px 0;font-weight:400}
+.end.lose h2{color:var(--warn)}
+</style>
+</head>
+<body>
+<main>
+  <h1>🌙 Sabaha Kadar</h1>
+  <div class="box"><div class="stats"><div id="hp"></div><div id="food"></div></div><div class="time" id="time"></div></div>
+  <div class="scene day" id="scene"></div>
+  <div class="box text" id="text"></div>
+  <div class="box"><div class="chips" id="inv"></div></div>
+  <div class="actions" id="actions"></div>
+  <div class="box log" id="log" style="margin-top:14px"></div>
+</main>
+<script>
+const $=s=>document.querySelector(s);
+const ITEMS={odun:['🪵','Odun'],tahta:['🟫','Tahta'],tas:['🪨','Taş'],komur:['⚫','Kömür'],yun:['🧶','Yün'],cigEt:['🥩','Çiğ et'],pisEt:['🍖','Pişmiş et'],elma:['🍎','Elma']};
+let S;
+function fresh(){S={hp:10,food:10,t:0,loc:'camp',inv:{odun:0,tahta:0,tas:0,komur:0,yun:0,cigEt:0,pisEt:0,elma:0},kazma:false,kilic:false,mesale:false,shelter:false,bed:false,over:null,log:['Gözlerini açtın. Güneş batıyor, gece yaklaşıyor.']};}
+const night=()=>S.t>=8;
+const safe=()=>S.shelter&&S.loc==='camp';
+const say=m=>{S.log.unshift(m);S.log=S.log.slice(0,6)};
+const rnd=()=>Math.random();
+function hurt(n,why){S.hp=Math.max(0,S.hp-n);say(why+' (−'+n+' ❤)')}
+function tick(){
+  S.t++;
+  if(S.t===8)say('🌙 Gece oldu! Zombiler çıkıyor.');
+  if(S.t%2===0)S.food=Math.max(0,S.food-1);
+  if(S.food===0)hurt(1,'Açlıktan zayıf düştün');
+  if(S.loc==='cave'&&!S.mesale&&rnd()<.4)hurt(1,'Karanlıkta bir şeye çarptın');
+  if(night()&&!safe()&&rnd()<.7)hurt(S.kilic?1:3,S.kilic?'Zombiyle kılıçla dövüştün ama yaralandın':'Bir zombi saldırdı');
+  if(S.hp<=0)S.over='lose';else if(S.t>=16)S.over='win';
+}
+function go(l,m){S.loc=l;say(m);tick()}
+function eat(k,n,m){const i=S.inv;i[k]--;S.food=Math.min(10,S.food+n);say(m)}
+function actions(){
+  const i=S.inv,A=[];
+  const add=(l,f,ok=true,h='')=>A.push({l,f,ok,h});
+  if(S.loc==='camp'){
+    add('🌳 Ormana git',()=>go('forest','Ormana vardın.'));
+    add('🕳️ Mağaraya git',()=>go('cave','Mağaraya girdin. İçerisi serin ve karanlık.'));
+    add('🐑 Çayıra git',()=>go('meadow','Çayıra çıktın.'));
+    add('🟫 Odundan 2 tahta yap',()=>{i.odun--;i.tahta+=2;say('1 odundan 2 tahta yaptın.')},i.odun>=1,'1 odun');
+    add('⛏️ Kazma yap',()=>{i.tahta-=3;S.kazma=true;say('Kazma yaptın. Artık taş kırabilirsin.')},!S.kazma&&i.tahta>=3,'3 tahta');
+    add('🗡️ Kılıç yap',()=>{i.tahta-=2;i.tas--;S.kilic=true;say('Kılıç yaptın. Zombiler daha az zarar verir.')},!S.kilic&&i.tahta>=2&&i.tas>=1,'2 tahta, 1 taş');
+    add('🔦 Meşale yap',()=>{i.komur--;i.tahta--;S.mesale=true;say('Meşale yaptın. Mağara artık aydınlık.')},!S.mesale&&i.komur>=1&&i.tahta>=1,'1 kömür, 1 tahta');
+    add('🏠 Sığınak kur',()=>{i.tahta-=8;S.shelter=true;say('Sığınağı kurdun. Burada zombiler sana ulaşamaz.');tick()},!S.shelter&&i.tahta>=8,'8 tahta');
+    add('🛏️ Yatak yap',()=>{i.yun-=3;i.tahta-=3;S.bed=true;say('Yatak yaptın.')},!S.bed&&i.yun>=3&&i.tahta>=3,'3 yün, 3 tahta');
+    add('🔥 Eti pişir',()=>{i.cigEt--;i.pisEt++;say('Eti ateşte pişirdin.')},i.cigEt>=1,'1 çiğ et');
+    if(night()&&S.shelter&&S.bed)add('😴 Sabaha kadar uyu',()=>{S.t=15;say('Yatağa uzandın...');tick()});
+    add('⏳ Bekle',()=>{say('Bekledin.');tick()});
+  }
+  if(S.loc==='forest'){
+    add('🪓 Odun kes',()=>{i.odun+=3;say('3 odun topladın.');tick()});
+    add('🍎 Elma ara',()=>{if(rnd()<.6){i.elma++;say('Bir elma buldun.')}else say('Elma bulamadın.');tick()});
+  }
+  if(S.loc==='cave'){
+    add('🪨 Taş kır',()=>{i.tas+=2;say('2 taş kırdın.');tick()},S.kazma,'Kazma gerekli');
+    add('⚫ Kömür çıkar',()=>{i.komur++;say('Bir kömür çıkardın.');tick()},S.kazma,'Kazma gerekli');
+  }
+  if(S.loc==='meadow'){
+    add('🐑 Koyun avla',()=>{i.yun++;const e=S.kilic?2:1;i.cigEt+=e;say('1 yün ve '+e+' çiğ et aldın.');tick()});
+  }
+  if(S.loc!=='camp')add('🏕️ Kampa dön',()=>go('camp','Kampa döndün.'));
+  if(i.elma)add('🍎 Elma ye',()=>eat('elma',2,'Elma yedin (+2 tokluk).'),S.food<10,'+2 tokluk');
+  if(i.cigEt)add('🥩 Çiğ et ye',()=>eat('cigEt',2,'Çiğ et yedin (+2 tokluk).'),S.food<10,'+2 tokluk');
+  if(i.pisEt)add('🍖 Pişmiş et ye',()=>eat('pisEt',5,'Pişmiş et yedin (+5 tokluk).'),S.food<10,'+5 tokluk');
+  return A;
+}
+function sceneInfo(){
+  const l=S.loc,n=night();
+  if(l==='camp')return{art:S.shelter?'🏠':'🏕️',cls:n?'night':'day',txt:safe()&&n?'Sığınağın içindesin. Dışarıdan zombi sesleri geliyor ama içeri giremiyorlar.':n?'Kampındasın ama etrafta zombi sesleri var. Bir sığınak işe yarardı.':'Kampındasın. Güneş batmak üzere. Odun, taş ve yiyecek toplayıp geceye hazırlan.'};
+  if(l==='forest')return{art:'🌲🌳🌲',cls:n?'night':'day',txt:n?'Orman karanlık. Ağaçların arasında hışırtılar var.':'Yüksek meşe ağaçları var. Odun toplamak için ideal.'};
+  if(l==='cave')return{art:'⛰️🕳️⛰️',cls:'cave',txt:S.mesale?'Meşalen mağarayı aydınlatıyor. Duvarlarda taş ve kömür damarları var.':'Mağara çok karanlık. Bir meşalen olsaydı daha güvenli olurdu.'};
+  return{art:'🐑🌾🐑',cls:n?'night':'day',txt:n?'Koyunlar uyuyor ama gece çayırda zombiler dolaşıyor.':'Koyun sürüsü otluyor. Yün ve et için bir fırsat.'};
+}
+function render(){
+  $('#hp').textContent='❤️'.repeat(S.hp)+'🖤'.repeat(10-S.hp);
+  $('#food').textContent='🍖'.repeat(S.food)+'▫️'.repeat(10-S.food);
+  let tl='';for(let k=0;k<16;k++)tl+='<i class="'+(k>=8?'n ':'')+(k<S.t?'p ':'')+(k===S.t?'now':'')+'"></i>';
+  $('#time').innerHTML=tl;
+  const si=sceneInfo(),sc=$('#scene');
+  sc.className='scene '+si.cls;
+  sc.innerHTML=si.art+(night()?'<span class="moon">🌙</span>':'')+(night()&&!safe()&&S.loc!=='cave'?'<span class="mob">🧟</span>':'');
+  const inv=S.inv;let c='';
+  for(const k in ITEMS)if(inv[k])c+='<span class="chip">'+ITEMS[k][0]+' '+ITEMS[k][1]+' ×'+inv[k]+'</span>';
+  if(S.kazma)c+='<span class="chip">⛏️ Kazma</span>';
+  if(S.kilic)c+='<span class="chip">🗡️ Kılıç</span>';
+  if(S.mesale)c+='<span class="chip">🔦 Meşale</span>';
+  if(S.bed)c+='<span class="chip">🛏️ Yatak</span>';
+  $('#inv').innerHTML=c||'<span class="chip empty">🎒 Envanter boş</span>';
+  $('#log').innerHTML=S.log.map(m=>'<p>'+m+'</p>').join('');
+  const box=$('#actions');box.innerHTML='';
+  if(S.over){
+    $('#text').innerHTML='';
+    const d=document.createElement('div');d.className='box end '+S.over;
+    d.style.gridColumn='1/-1';
+    d.innerHTML=S.over==='win'?'<h2>🌅 Güneş doğdu!</h2><p>İlk geceyi sağ atlattın. Tebrikler!</p>':'<h2>💀 Öldün</h2><p>Bu gece sana çok zor geldi. Tekrar dene.</p>';
+    const b=document.createElement('button');b.textContent='🔄 Yeniden oyna';b.onclick=()=>{fresh();render()};
+    d.appendChild(b);box.appendChild(d);return;
+  }
+  $('#text').textContent=si.txt;
+  actions().forEach(a=>{
+    const b=document.createElement('button');
+    b.innerHTML=a.l+(a.h?'<small>'+a.h+'</small>':'');
+    b.disabled=!a.ok;
+    b.onclick=()=>{a.f();render()};
+    box.appendChild(b);
+  });
+}
+fresh();render();
+if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{})})}
+</script>
+</body>
+</html>
